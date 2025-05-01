@@ -1,0 +1,2 @@
+#define MFTINDEXER_API __declspec(dllexport)
+#define MFTINDEXER_API __declspec(dllimport)
