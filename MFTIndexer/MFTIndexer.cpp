@@ -1,20 +1,39 @@
 #include <windows.h>
 #include <winioctl.h>
-#include <tchar.h>
 #include <fstream>
 #include <vector>
 #include <string>
+#include <map>
+#include <sstream>
 
 #define BUFFER_SIZE (1024 * 1024)
 
-std::wstring ConvertToJsonArray(const std::vector<std::wstring>& paths) {
-    std::wstring json = L"[";
-    for (size_t i = 0; i < paths.size(); ++i) {
-        json += L"\"" + paths[i] + L"\"";
-        if (i != paths.size() - 1) json += L",";
+struct MFTEntry {
+    ULONGLONG ParentFRN;
+    std::wstring Name;
+};
+
+std::wstring EscapeJsonString(const std::wstring& input) {
+    std::wstringstream ss;
+    for (auto c : input) {
+        switch (c) {
+        case L'"': ss << L"\\\""; break;
+        case L'\\': ss << L"\\\\"; break;
+        default: ss << c; break;
+        }
     }
-    json += L"]";
-    return json;
+    return ss.str();
+}
+
+std::wstring BuildFullPath(ULONGLONG frn, const std::map<ULONGLONG, MFTEntry>& entries) {
+    std::wstring path;
+    auto it = entries.find(frn);
+    while (it != entries.end()) {
+        if (it->second.Name.empty()) break;
+        path = L"\\" + it->second.Name + path;
+        it = entries.find(it->second.ParentFRN);
+    }
+    return path;
 }
 
 extern "C" __declspec(dllexport)
@@ -42,7 +61,7 @@ bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
     mftEnumData.LowUsn = 0;
     mftEnumData.HighUsn = MAXLONGLONG;
 
-    std::vector<std::wstring> resultPaths;
+    std::map<ULONGLONG, MFTEntry> entries;
 
     while (DeviceIoControl(
         hVol,
@@ -60,9 +79,15 @@ bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
 
         while ((ptr - buffer) < bytesReturned) {
             USN_RECORD* record = (USN_RECORD*)ptr;
+
             std::wstring name(record->FileName, record->FileNameLength / sizeof(WCHAR));
-            if (!name.empty() && name[0] != L'$')
-                resultPaths.push_back(name);
+            if (!name.empty() && name[0] != L'$') {
+                entries[record->FileReferenceNumber] = {
+                    record->ParentFileReferenceNumber,
+                    name
+                };
+            }
+
             ptr += record->RecordLength;
         }
 
@@ -77,9 +102,24 @@ bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
         return false;
     }
 
-    outFile << ConvertToJsonArray(resultPaths);
-    outFile.close();
+    outFile << L"[\n";
+    bool first = true;
+    for (const auto& pair : entries)
+    {
+        auto frn = pair.first;
+        const auto& entry = pair.second;
 
+        std::wstring fullPath = BuildFullPath(frn, entries);
+        if (fullPath.empty()) continue;
+
+        if (!first) outFile << L",\n";
+        first = false;
+
+        outFile << L"  \"" << EscapeJsonString(fullPath) << L"\"";
+    }
+    outFile << L"\n]";
+
+    outFile.close();
     delete[] buffer;
     return true;
 }
