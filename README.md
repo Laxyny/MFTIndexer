@@ -29,13 +29,27 @@ Unlike traditional indexing, it avoids recursive directory scanning, resulting i
 
 ## Usage
 
+### Building
+
+This project targets Windows and can be compiled with Visual Studio or with
+[CMake](https://cmake.org/) using a MinGW toolchain.
+
+```bash
+# Example using mingw-w64 on Linux
+cmake -B build -DCMAKE_TOOLCHAIN_FILE=<path-to-mingw-toolchain.cmake>
+cmake --build build --config Release
+```
+
+The resulting `MFTIndexer.dll` library and `MFTIndexer.exe` CLI are produced in
+the build directory.
+
 ### As an executable
 
 ```bash
 MFTIndexer.exe --export output.json
 ```
 
-> Exports a full list of file paths to `output.json`.
+Exports a full list of file paths to `output.json`.
 
 ### As a DLL
 
