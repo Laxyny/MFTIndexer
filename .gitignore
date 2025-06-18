@@ -1,38 +1,39 @@
-# Prerequisites
-*.d
+# === Fichiers Visual Studio (C++) ===
+.vs/
+*.suo
+*.user
+*.VC.db
+*.VC.VC.opendb
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
+# === Builds C++ ===
+**/x64/
+**/Debug/
+**/Release/
 *.obj
-
-# Precompiled Headers
-*.gch
 *.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
+*.pdb
+*.idb
+*.exp
+*.lib
 *.dll
 
-# Fortran module files
-*.mod
-*.smod
+# === Builds .NET ===
+bin/
+obj/
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+# === Logs / rapports ===
+*.log
+*.json
+!MFTIndexerCLI/output.json  # <-- si tu veux garder un exemple d'output (sinon ignorer)
 
-# Executables
-*.exe
-*.out
-*.app
+# === CMake ===
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
 
-.vs/
-x64/
-Debug/
-Release/
-build/
+# === Autres ===
+*.DS_Store
+*.bak
+*.tmp
+Thumbs.db
