@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 #include <sstream>
+#include <iomanip>
 
 #define BUFFER_SIZE (1024 * 1024)
 
@@ -36,6 +37,33 @@ static std::wstring BuildFullPath(ULONGLONG frn, const std::map<ULONGLONG, MFTEn
     return path;
 }
 
+static void LogError(const std::wstring& msg, DWORD err)
+{
+    std::wofstream log(L"debug_log.txt", std::ios::app);
+    log << msg << L" (error=" << err << L")" << std::endl;
+}
+
+static bool EnsureUsnJournal(HANDLE hVol)
+{
+    DWORD bytes = 0;
+    USN_JOURNAL_DATA journal{};
+    if (DeviceIoControl(hVol, FSCTL_QUERY_USN_JOURNAL, nullptr, 0,
+                        &journal, sizeof(journal), &bytes, nullptr))
+    {
+        return true;
+    }
+
+    CREATE_USN_JOURNAL_DATA createData{};
+    if (!DeviceIoControl(hVol, FSCTL_CREATE_USN_JOURNAL,
+                         &createData, sizeof(createData),
+                         nullptr, 0, &bytes, nullptr))
+    {
+        LogError(L"CREATE_USN_JOURNAL failed", GetLastError());
+        return false;
+    }
+    return true;
+}
+
 static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>& paths) {
     std::wstring driveLetter;
     if (wcsncmp(volumePath, L"\\\\.\\", 4) == 0 && wcslen(volumePath) >= 5) {
@@ -55,12 +83,20 @@ static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>&
     );
 
     if (hVol == INVALID_HANDLE_VALUE) {
+        LogError(L"CreateFile failed", GetLastError());
+        return false;
+    }
+
+    if (!EnsureUsnJournal(hVol))
+    {
+        CloseHandle(hVol);
         return false;
     }
 
     BYTE* buffer = new BYTE[BUFFER_SIZE];
     ZeroMemory(buffer, BUFFER_SIZE);
     DWORD bytesReturned = 0;
+    bool gotData = false;
 
     MFT_ENUM_DATA mftEnumData = { 0 };
     mftEnumData.StartFileReferenceNumber = 0;
@@ -69,22 +105,33 @@ static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>&
 
     std::map<ULONGLONG, MFTEntry> entries;
 
-    while (DeviceIoControl(
-        hVol,
-        FSCTL_ENUM_USN_DATA,
-        &mftEnumData,
-        sizeof(mftEnumData),
-        buffer,
-        BUFFER_SIZE,
-        &bytesReturned,
-        NULL))
+    while (true)
     {
+        if (!DeviceIoControl(
+            hVol,
+            FSCTL_ENUM_USN_DATA,
+            &mftEnumData,
+            sizeof(mftEnumData),
+            buffer,
+            BUFFER_SIZE,
+            &bytesReturned,
+            NULL))
+        {
+            DWORD err = GetLastError();
+            if (err == ERROR_HANDLE_EOF)
+                break;
+            LogError(L"FSCTL_ENUM_USN_DATA failed", err);
+            delete[] buffer;
+            CloseHandle(hVol);
+            return false;
+        }
+        gotData = true;
         BYTE* ptr = buffer;
         ptr += sizeof(DWORD); // version
         ptr += sizeof(USN);   // usn
 
         std::wofstream logStep(L"debug_log.txt", std::ios::app);
-        logStep << L"DeviceIoControl OK — bytesReturned = " << bytesReturned << L"\n";
+        logStep << L"DeviceIoControl OK Â— bytesReturned = " << bytesReturned << L"\n";
 
         while ((ptr - buffer) < bytesReturned) {
             USN_RECORD* record = (USN_RECORD*)ptr;
@@ -110,6 +157,12 @@ static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>&
 
     CloseHandle(hVol);
 
+    if (!gotData)
+    {
+        delete[] buffer;
+        return false;
+    }
+
     for (const auto& pair : entries)
     {
         auto frn = pair.first;
@@ -122,7 +175,7 @@ static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>&
 
     delete[] buffer;
     std::wofstream finalLog(L"debug_log.txt", std::ios::app);
-    finalLog << L"Total fichiers indexés : " << paths.size() << L"\n";
+    finalLog << L"Total fichiers indexÃ©s : " << paths.size() << L"\n";
 
     return true;
 }
