@@ -83,15 +83,23 @@ static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>&
         ptr += sizeof(DWORD); // version
         ptr += sizeof(USN);   // usn
 
+        std::wofstream logStep(L"debug_log.txt", std::ios::app);
+        logStep << L"DeviceIoControl OK — bytesReturned = " << bytesReturned << L"\n";
+
         while ((ptr - buffer) < bytesReturned) {
             USN_RECORD* record = (USN_RECORD*)ptr;
 
             std::wstring name(record->FileName, record->FileNameLength / sizeof(WCHAR));
+            std::wofstream debugLog(L"debug_log.txt", std::ios::app);
             if (!name.empty() && name[0] != L'$') {
                 entries[record->FileReferenceNumber] = {
                     record->ParentFileReferenceNumber,
                     name
                 };
+                debugLog << L"Name: " << name << L"\n";
+            }
+            else {
+                debugLog << L"IGNORED: " << name << L"\n";
             }
 
             ptr += record->RecordLength;
@@ -113,6 +121,9 @@ static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>&
     }
 
     delete[] buffer;
+    std::wofstream finalLog(L"debug_log.txt", std::ios::app);
+    finalLog << L"Total fichiers indexés : " << paths.size() << L"\n";
+
     return true;
 }
 
