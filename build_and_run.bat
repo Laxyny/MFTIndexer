@@ -10,7 +10,7 @@ if "%DRIVE%"=="" (
 
 set ROOT=%~dp0
 set DLL_SRC=%ROOT%MFTIndexer\x64\Release\MFTIndexer.dll
-set DLL_DEST=%ROOT%MFTIndexerCLI\bin\Release\net9.0\MFTIndexer.dll
+set DLL_DEST=%ROOT%MFTIndexerCLI\bin\Release\net8.0\MFTIndexer.dll
 set CLI_DIR=%ROOT%MFTIndexerCLI
 
 :: --- Build .NET ---
@@ -32,7 +32,7 @@ if not exist "%DLL_DEST%" (
 
 :: --- Exécution ---
 echo [3/4] Exécution depuis le bon dossier...
-cd /d "%CLI_DIR%\bin\Release\net9.0"
+cd /d "%CLI_DIR%\bin\Release\net8.0"
 echo [4/4] Lancement de MFTIndexerCLI.exe sur %DRIVE%:
 MFTIndexerCLI.exe %DRIVE%
 

@@ -46,16 +46,17 @@ the build directory.
 ### As an executable
 
 ```bash
-MFTIndexer.exe --export output.json
+MFTIndexer.exe -d C -o paths.json
 ```
 
-Exports a full list of file paths to `output.json`.
+Exports all file paths from drive `C:` to `paths.json`. Use `-s` for silent mode.
 
 ### As a DLL
 
 ```cpp
 // Exported from the DLL
-void ExportToJson(const wchar_t* outputPath);
+bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath);
+bool ExportMFTToMemory(const wchar_t* volumePath, MFTPathCallback cb);
 ```
 
 > Ideal for integration with C++, C#, Rust or any language supporting native interop.
@@ -66,7 +67,7 @@ void ExportToJson(const wchar_t* outputPath);
 
 ```csharp
 [DllImport("MFTIndexer.dll", CharSet = CharSet.Unicode)]
-public static extern void ExportToJson(string outputPath);
+public static extern bool ExportMFTToJson(string volumePath, string outputPath);
 ```
 
 ---

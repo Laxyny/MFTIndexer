@@ -25,7 +25,7 @@ std::wstring EscapeJsonString(const std::wstring& input) {
     return ss.str();
 }
 
-std::wstring BuildFullPath(ULONGLONG frn, const std::map<ULONGLONG, MFTEntry>& entries) {
+static std::wstring BuildFullPath(ULONGLONG frn, const std::map<ULONGLONG, MFTEntry>& entries) {
     std::wstring path;
     auto it = entries.find(frn);
     while (it != entries.end()) {
@@ -36,8 +36,14 @@ std::wstring BuildFullPath(ULONGLONG frn, const std::map<ULONGLONG, MFTEntry>& e
     return path;
 }
 
-extern "C" __declspec(dllexport)
-bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
+static bool EnumeratePaths(const wchar_t* volumePath, std::vector<std::wstring>& paths) {
+    std::wstring driveLetter;
+    if (wcsncmp(volumePath, L"\\\\.\\", 4) == 0 && wcslen(volumePath) >= 5) {
+        driveLetter.assign(1, volumePath[4]);
+    } else {
+        driveLetter.assign(1, volumePath[0]);
+    }
+
     HANDLE hVol = CreateFileW(
         volumePath,
         GENERIC_READ,
@@ -96,22 +102,35 @@ bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
 
     CloseHandle(hVol);
 
+    for (const auto& pair : entries)
+    {
+        auto frn = pair.first;
+        std::wstring fullPath = BuildFullPath(frn, entries);
+        if (fullPath.empty())
+            continue;
+        std::wstring finalPath = driveLetter + L":" + fullPath;
+        paths.push_back(std::move(finalPath));
+    }
+
+    delete[] buffer;
+    return true;
+}
+
+extern "C" __declspec(dllexport)
+bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
+    std::vector<std::wstring> paths;
+    if (!EnumeratePaths(volumePath, paths))
+        return false;
+
     std::wofstream outFile(outputPath);
     if (!outFile.is_open()) {
-        delete[] buffer;
         return false;
     }
 
     outFile << L"[\n";
     bool first = true;
-    for (const auto& pair : entries)
+    for (const auto& fullPath : paths)
     {
-        auto frn = pair.first;
-        const auto& entry = pair.second;
-
-        std::wstring fullPath = BuildFullPath(frn, entries);
-        if (fullPath.empty()) continue;
-
         if (!first) outFile << L",\n";
         first = false;
 
@@ -120,6 +139,18 @@ bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
     outFile << L"\n]";
 
     outFile.close();
-    delete[] buffer;
+    return true;
+}
+
+extern "C" __declspec(dllexport)
+bool ExportMFTToMemory(const wchar_t* volumePath, void(__stdcall* callback)(const wchar_t*)) {
+    std::vector<std::wstring> paths;
+    if (!EnumeratePaths(volumePath, paths))
+        return false;
+    if (!callback) return true;
+    for (const auto& p : paths)
+    {
+        callback(p.c_str());
+    }
     return true;
 }

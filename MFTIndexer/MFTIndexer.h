@@ -17,6 +17,8 @@ extern "C" {
 #endif
 
 MFTINDEXER_API bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath);
+typedef void(__stdcall *MFTPathCallback)(const wchar_t* path);
+MFTINDEXER_API bool ExportMFTToMemory(const wchar_t* volumePath, MFTPathCallback callback);
 
 #ifdef __cplusplus
 }
