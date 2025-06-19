@@ -32,10 +32,13 @@ Unlike traditional indexing, it avoids recursive directory scanning, resulting i
 ### As an executable
 
 ```bash
-MFTIndexer.exe --export output.json
+MFTIndexer.exe C output.json
 ```
 
-> Exports a full list of file paths to `output.json`.
+Run the tool from an elevated command prompt. The first argument is the target
+volume letter and the second is the output path. Using the raw volume path
+avoids the common `FSCTL_ENUM_USN_DATA failed (error=87)` message caused by an
+invalid handle or insufficient privileges.
 
 ### As a DLL
 

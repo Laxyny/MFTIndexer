@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 #include <sstream>
+#include "MFTIndexer.h"
 
 #define BUFFER_SIZE (1024 * 1024)
 
@@ -36,7 +37,6 @@ std::wstring BuildFullPath(ULONGLONG frn, const std::map<ULONGLONG, MFTEntry>& e
     return path;
 }
 
-extern "C" __declspec(dllexport)
 bool ExportMFTToJson(const wchar_t* volumePath, const wchar_t* outputPath) {
     HANDLE hVol = CreateFileW(
         volumePath,
