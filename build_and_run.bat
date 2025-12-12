@@ -3,37 +3,46 @@ setlocal
 
 :: --- Config ---
 set DRIVE=%1
-if "%DRIVE%"=="" (
-    echo Erreur : Spécifie une lettre de lecteur (ex: build_and_run.bat C)
-    exit /b 1
-)
+set OUTPUT=%2
+if "%DRIVE%"=="" set DRIVE=C
+if "%OUTPUT%"=="" set OUTPUT=output.json
 
 set ROOT=%~dp0
 set DLL_SRC=%ROOT%MFTIndexer\x64\Release\MFTIndexer.dll
-set DLL_DEST=%ROOT%MFTIndexerCLI\bin\Release\net8.0\MFTIndexer.dll
 set CLI_DIR=%ROOT%MFTIndexerCLI
+set CLI_BIN=%CLI_DIR%\bin\Release\net8.0
+
+echo [INFO] Note: This script assumes the Native DLL has been built manually via Visual Studio.
+echo [INFO] If you modified MFTIndexer.cpp, please rebuild the solution 'MFTIndexer.sln' in Release mode first.
+echo.
 
 :: --- Build .NET ---
-echo [1/4] Build du projet .NET...
+echo [1/3] Build .NET project...
 cd /d "%CLI_DIR%"
 dotnet build -c Release
 if errorlevel 1 (
-    echo Build .NET a échoué.
+    echo [ERROR] .NET Build failed.
     exit /b 1
 )
 
-:: --- Copier DLL native ---
-echo [2/4] Copie de la DLL native...
-copy "%DLL_SRC%" "%DLL_DEST%" /Y >nul
-if not exist "%DLL_DEST%" (
-    echo Erreur : la DLL native n'a pas été copiée !
-    exit /b 1
+:: --- Copy Native DLL ---
+echo [2/3] Copying Native DLL...
+if exist "%DLL_SRC%" (
+    copy "%DLL_SRC%" "%CLI_BIN%\MFTIndexer.dll" /Y >nul
+    echo [OK] DLL copied.
+) else (
+    echo [WARNING] Native DLL not found at %DLL_SRC%
+    echo [WARNING] Please build the native C++ project first!
 )
 
-:: --- Exécution ---
-echo [3/4] Exécution depuis le bon dossier...
-cd /d "%CLI_DIR%\bin\Release\net8.0"
-echo [4/4] Lancement de MFTIndexerCLI.exe sur %DRIVE%:
-MFTIndexerCLI.exe %DRIVE%
+:: --- Run ---
+echo [3/3] Running MFTIndexerCLI...
+set EXE_PATH=%CLI_BIN%\MFTIndexerCLI.exe
+
+if exist "%EXE_PATH%" (
+    "%EXE_PATH%" -d %DRIVE% -o "%OUTPUT%"
+) else (
+    echo [ERROR] Executable not found at %EXE_PATH%
+)
 
 endlocal

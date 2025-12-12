@@ -2,25 +2,69 @@
 #include <iostream>
 #include <string>
 #include <cwchar>
+#include <algorithm>
+
+void PrintUsage() {
+    std::wcout << L"Usage: MFTIndexer [-d DRIVE] [-o OUTPUT] [--silent]\n"
+               << L"  -d, --drive   Drive letter (e.g. C)\n"
+               << L"  -o, --output  Output JSON file\n"
+               << L"  -s, --silent  Suppress output\n";
+}
 
 int wmain(int argc, wchar_t* argv[])
 {
-    const wchar_t* volume = L"\\\\.\\C:";
-    const wchar_t* output = L"mft.json";
+    std::wstring drive = L"C";
+    std::wstring output = L"output.json";
+    bool silent = false;
 
     for (int i = 1; i < argc; ++i) {
-        if (wcscmp(argv[i], L"--volume") == 0 && i + 1 < argc) {
-            volume = argv[++i];
-        } else if (wcscmp(argv[i], L"--export") == 0 && i + 1 < argc) {
-            output = argv[++i];
+        std::wstring arg = argv[i];
+        if (arg == L"-d" || arg == L"--drive") {
+            if (i + 1 < argc) {
+                drive = argv[++i];
+            } else {
+                std::wcerr << L"Missing value for --drive\n";
+                return 1;
+            }
+        } else if (arg == L"-o" || arg == L"--output") {
+            if (i + 1 < argc) {
+                output = argv[++i];
+            } else {
+                std::wcerr << L"Missing value for --output\n";
+                return 1;
+            }
+        } else if (arg == L"-s" || arg == L"--silent") {
+            silent = true;
+        } else if (arg == L"-h" || arg == L"--help") {
+            PrintUsage();
+            return 0;
         }
     }
 
-    if (!ExportMFTToJson(volume, output)) {
-        std::wcerr << L"Failed to export MFT" << std::endl;
+    // Normalize drive
+    // Remove : \ /
+    drive.erase(std::remove(drive.begin(), drive.end(), L':'), drive.end());
+    drive.erase(std::remove(drive.begin(), drive.end(), L'\\'), drive.end());
+    drive.erase(std::remove(drive.begin(), drive.end(), L'/'), drive.end());
+
+    if (drive.empty()) {
+        if (!silent) std::wcerr << L"Invalid drive letter\n";
         return 1;
     }
 
-    std::wcout << L"Exported to " << output << std::endl;
+    std::wstring volumePath = L"\\\\.\\" + drive + L":";
+
+    if (!silent) {
+        std::wcout << L"Indexing " << volumePath << L" to " << output << L"..." << std::endl;
+    }
+
+    if (!ExportMFTToJson(volumePath.c_str(), output.c_str())) {
+        if (!silent) std::wcerr << L"Failed to export MFT. Ensure you are running as Admin." << std::endl;
+        return 1;
+    }
+
+    if (!silent) {
+        std::wcout << L"Exported successfully." << std::endl;
+    }
     return 0;
 }
